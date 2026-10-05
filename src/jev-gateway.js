@@ -29,7 +29,6 @@ export function createJevGatewayClient() {
   return new Anthropic({
     apiKey: apiKey,
     baseURL: "https://api.gateway.vercel.com",
-    // Note: The gateway will route requests to Claude through Jev for structured decisions
   });
 }
 
@@ -45,33 +44,15 @@ export function createStandardAnthropicClient() {
 }
 
 /**
- * Type definition for a structured decision request
- * @typedef {Object} StructuredDecision
- * @property {string} prompt - The decision-making prompt
- * @property {Object} schema - JSON schema defining the expected response structure
- * @property {string} [model] - Model to use (defaults to claude-opus-5-5)
- * @property {number} [temperature] - Temperature for the decision (0-1)
- */
-
-/**
  * Makes a structured decision using Jev through the Vercel AI Gateway
  * Use this for non-deterministic decisions that need structured output
  *
- * @param {StructuredDecision} decisionConfig - Configuration for the structured decision
+ * @param {Object} decisionConfig - Configuration for the structured decision
+ * @param {string} decisionConfig.prompt - The decision-making prompt
+ * @param {Object} decisionConfig.schema - JSON schema defining the expected response structure
+ * @param {string} [decisionConfig.model] - Model to use (defaults to claude-opus-5-5)
+ * @param {number} [decisionConfig.temperature] - Temperature for the decision (0-1)
  * @returns {Promise<Object>} Parsed response matching the schema
- *
- * @example
- * const decision = await makeStructuredDecision({
- *   prompt: "Classify this sentiment: 'Great product!'",
- *   schema: {
- *     type: "object",
- *     properties: {
- *       sentiment: { type: "string", enum: ["positive", "negative", "neutral"] },
- *       confidence: { type: "number", minimum: 0, maximum: 1 }
- *     },
- *     required: ["sentiment", "confidence"]
- *   }
- * });
  */
 export async function makeStructuredDecision(decisionConfig) {
   const {
@@ -94,17 +75,14 @@ export async function makeStructuredDecision(decisionConfig) {
           content: prompt,
         },
       ],
-      // Jev will handle schema validation through the gateway
       system: `You are a decision-making assistant. Respond with valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}`,
     });
 
-    // Extract the text response
     const textContent = response.content.find((block) => block.type === "text");
     if (!textContent || textContent.type !== "text") {
       throw new Error("No text content in response");
     }
 
-    // Parse and validate against schema
     const result = JSON.parse(textContent.text);
     return result;
   } catch (error) {

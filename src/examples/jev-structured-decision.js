@@ -155,7 +155,6 @@ async function runExamples() {
   console.log("ℹ️  These examples use Jev through the Vercel AI Gateway");
   console.log("ℹ️  Requires AI_GATEWAY_API_KEY to be set\n");
 
-  // Run examples sequentially
   await classifySentiment();
   await classifyPriority();
   await validateDataQuality();
@@ -165,7 +164,6 @@ async function runExamples() {
   console.log("═══════════════════════════════════════════════");
 }
 
-// Run examples if this is the main module
 if (import.meta.url === `file://${process.argv[1]}`) {
   runExamples().catch((error) => {
     console.error("Fatal error:", error);

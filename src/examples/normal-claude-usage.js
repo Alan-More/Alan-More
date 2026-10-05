@@ -4,10 +4,6 @@
  * This example shows how Claude Code continues to use the standard Anthropic API
  * for regular conversations and general tasks.
  *
- * Claude Code uses:
- *   - ANTHROPIC_BASE_URL = https://api.anthropic.com (default)
- *   - No changes to normal operation
- *
  * Run: node src/examples/normal-claude-usage.js
  */
 
@@ -69,7 +65,6 @@ async function runExamples() {
   console.log("ℹ️  These examples use the standard Anthropic API");
   console.log("ℹ️  ANTHROPIC_BASE_URL remains api.anthropic.com\n");
 
-  // Run examples sequentially
   await askQuestion();
   await generateCode();
   await summarizeText();
@@ -79,7 +74,6 @@ async function runExamples() {
   console.log("═══════════════════════════════════════════════");
 }
 
-// Run examples if this is the main module
 if (import.meta.url === `file://${process.argv[1]}`) {
   runExamples().catch((error) => {
     console.error("Fatal error:", error);
