@@ -12,24 +12,52 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
+export const JEV_GATEWAY_BASE_URL =
+  process.env.AI_GATEWAY_BASE_URL || "https://ai-gateway.vercel.sh";
+
+// Vercel AI Gateway model ids are provider-prefixed (e.g. "anthropic/<model>")
+export const JEV_DEFAULT_MODEL =
+  process.env.JEV_MODEL || "anthropic/claude-opus-5.5";
+
 /**
  * Creates an Anthropic client configured for Vercel AI Gateway
+ *
+ * Auth modes:
+ *   - AI_GATEWAY_API_KEY set (local dev): sent as `Authorization: Bearer <key>`
+ *   - Not set (Claude Code cloud): no auth header is sent by the SDK; the
+ *     platform's API credential injects `Authorization: Bearer <key>` for
+ *     ai-gateway.vercel.sh at the network proxy
+ *
+ * apiKey/authToken are passed explicitly so the SDK never falls back to
+ * ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN and leaks them to the gateway.
+ *
  * @returns {Anthropic} Client pointing to Vercel AI Gateway
- * @throws {Error} If AI_GATEWAY_API_KEY is not set
  */
 export function createJevGatewayClient() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY;
+  const gatewayKey = process.env.AI_GATEWAY_API_KEY;
 
-  if (!apiKey) {
-    throw new Error(
-      "AI_GATEWAY_API_KEY not found. Please configure it via Claude Platform Credential Vaults."
-    );
+  if (gatewayKey) {
+    return new Anthropic({
+      apiKey: null,
+      authToken: gatewayKey,
+      baseURL: JEV_GATEWAY_BASE_URL,
+    });
   }
 
-  return new Anthropic({
-    apiKey: apiKey,
-    baseURL: "https://api.gateway.vercel.com",
+  return new ProxyAuthAnthropic({
+    apiKey: null,
+    authToken: null,
+    baseURL: JEV_GATEWAY_BASE_URL,
   });
+}
+
+/**
+ * Anthropic client that sends no auth header of its own, for when the
+ * network proxy injects the gateway credential. The SDK otherwise refuses
+ * to send a request without apiKey or authToken.
+ */
+class ProxyAuthAnthropic extends Anthropic {
+  validateHeaders() {}
 }
 
 /**
@@ -50,7 +78,7 @@ export function createStandardAnthropicClient() {
  * @param {Object} decisionConfig - Configuration for the structured decision
  * @param {string} decisionConfig.prompt - The decision-making prompt
  * @param {Object} decisionConfig.schema - JSON schema defining the expected response structure
- * @param {string} [decisionConfig.model] - Model to use (defaults to claude-opus-5-5)
+ * @param {string} [decisionConfig.model] - Gateway model id (defaults to JEV_DEFAULT_MODEL)
  * @param {number} [decisionConfig.temperature] - Temperature for the decision (0-1)
  * @returns {Promise<Object>} Parsed response matching the schema
  */
@@ -58,7 +86,7 @@ export async function makeStructuredDecision(decisionConfig) {
   const {
     prompt,
     schema,
-    model = "claude-opus-5-5",
+    model = JEV_DEFAULT_MODEL,
     temperature = 0,
   } = decisionConfig;
 
