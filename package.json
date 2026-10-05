@@ -1,0 +1,25 @@
+{
+  "name": "alan-more-jev-integration",
+  "version": "1.0.0",
+  "description": "Jev integration for Claude Code with Vercel AI Gateway",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node src/index.js",
+    "test": "node --test src/**/*.test.js",
+    "lint": "eslint src"
+  },
+  "keywords": ["jev", "vercel", "ai-gateway", "typesafe-ai", "claude", "anthropic"],
+  "author": "Alan More",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@opengeni/jev": "^1.4.4"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
