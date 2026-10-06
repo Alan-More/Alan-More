@@ -18,21 +18,25 @@
    - No secrets in Git, logs, or configuration
 
 3. **Clear Separation of Concerns**
-   - Structured decisions → Jev (JSON matching a schema)
+   - Structured decisions → Jev (typed choice / yes-no / score answers)
    - Regular decisions → Claude (flexible responses)
 
 ## 🏗️ Architecture
 
 ```
 Claude Code Environment
-└── Vercel AI Gateway (ai-gateway.vercel.sh, model anthropic/claude-opus-5-5)
-    ├── [Jev Path] makeStructuredDecision
+└── Vercel AI Gateway (ai-gateway.vercel.sh)
+    ├── [Jev Path] makeStructuredDecision → typesafe-ai/jev
+    │   └── @opengeni/jev JevClient, baseUrl /typesafe (POST /typesafe/v1/systemone)
     │   └── Structured decisions: classification, validation
-    └── [Regular Path] makeRegularDecision
+    └── [Regular Path] makeRegularDecision → anthropic/claude-opus-5-5
+        └── Anthropic SDK, POST /v1/messages
         └── Regular tasks: conversations, code gen, analysis
 ```
 
-- Gateway model IDs are provider-prefixed (`anthropic/...`)
+- Gateway model IDs are provider-prefixed (`typesafe-ai/...`, `anthropic/...`)
+- `makeStructuredDecision` takes `{ state, questions }` and returns `{ answers, model, usage, costUsd }`;
+  Jev can't produce free-form fields, so use `makeRegularDecision` for those
 - `createStandardAnthropicClient()` (direct `api.anthropic.com`) is still exported but unused
 
 ## 📂 Project Structure
@@ -73,7 +77,7 @@ alan-more/
    ```javascript
    import { makeStructuredDecision, makeRegularDecision } from "./src/jev-gateway.js";
    
-   const decision = await makeStructuredDecision({...});
+   const decision = await makeStructuredDecision({ state, questions });
    const response = await makeRegularDecision("...");
    ```
 

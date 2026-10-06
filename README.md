@@ -1,19 +1,19 @@
 # Alan-More: Jev Integration with Vercel AI Gateway
 
-Integrate **Jev** (structured decision-making) with **Claude Code**, routing all Claude calls through the Vercel AI Gateway.
+Integrate **Jev** (structured decision-making) with **Claude Code**, routing both Jev and Claude calls through the Vercel AI Gateway.
 
 ## 🎯 Architecture
 
 ```
 Claude Code
-└── Vercel AI Gateway (ai-gateway.vercel.sh, model anthropic/claude-opus-5-5)
-    ├── Structured Decisions → Jev
+└── Vercel AI Gateway (ai-gateway.vercel.sh)
+    ├── Structured Decisions → Jev (typesafe-ai/jev, POST /typesafe/v1/systemone)
     │   └── Classification, validation, scoring
-    └── Regular Decisions
+    └── Regular Decisions → Claude (anthropic/claude-opus-5-5, POST /v1/messages)
         └── Conversations, code generation, analysis
 ```
 
-Both paths share one gateway client, so no `ANTHROPIC_API_KEY` is needed.
+Both paths use the same gateway credentials, so no `ANTHROPIC_API_KEY` is needed.
 
 ## 🔐 Setup
 
@@ -35,17 +35,24 @@ npm install
 import { makeStructuredDecision } from "./src/jev-gateway.js";
 
 const decision = await makeStructuredDecision({
-  prompt: "Classify this sentiment: 'Great product!'",
-  schema: {
-    type: "object",
-    properties: {
-      sentiment: { type: "string", enum: ["positive", "negative", "neutral"] },
-      confidence: { type: "number", minimum: 0, maximum: 1 }
+  state: "Customer review: 'Great product!'",
+  questions: {
+    sentiment: {
+      type: "choice",
+      instructions: "What is the overall sentiment of the review?",
+      criteria: { positive: null, negative: null, neutral: null }
     },
-    required: ["sentiment", "confidence"]
+    wouldRecommend: { type: "noul", instructions: "Would this customer recommend the product?" }
   }
 });
+
+decision.answers.sentiment.option;        // "positive"
+decision.answers.sentiment.probabilities; // { positive: 1, neutral: 0, negative: 0 }
+decision.answers.wouldRecommend.probability; // 0..1
+decision.model;                           // "typesafe-ai/jev"
 ```
+
+Jev answers typed questions (`choice`, `noul` yes/no probability, `score`) about a state. It doesn't generate free-form text or arbitrary JSON; use `makeRegularDecision` for that.
 
 ### Regular Decision
 
@@ -71,9 +78,10 @@ In Claude Code cloud sessions, prefix each command with `NODE_USE_ENV_PROXY=1` s
 
 ## 🔑 Key Functions
 
-- `makeStructuredDecision(config)` - Jev decisions via Vercel AI Gateway (returns parsed JSON)
+- `makeStructuredDecision({ state, questions })` - Jev (`typesafe-ai/jev`) decisions via Vercel AI Gateway
 - `makeRegularDecision(prompt, options)` - Free-form Claude responses via Vercel AI Gateway
-- `createJevGatewayClient()` - Gateway client used by both functions
+- `createJevClient()` - TypeSafe Jev client (`@opengeni/jev`) pointed at the gateway
+- `createJevGatewayClient()` - Anthropic SDK client pointed at the gateway (used for Claude)
 - `createStandardAnthropicClient()` - Direct `api.anthropic.com` client (unused by the functions above; requires `ANTHROPIC_API_KEY`)
 
 ## 🔒 Security

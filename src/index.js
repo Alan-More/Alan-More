@@ -4,6 +4,7 @@
 
 export {
   createJevGatewayClient,
+  createJevClient,
   createStandardAnthropicClient,
   makeStructuredDecision,
   makeRegularDecision,
