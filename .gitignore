@@ -37,7 +37,9 @@ temp/
 *.key
 *.keystore
 
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .claude.json
 
 *.bak
