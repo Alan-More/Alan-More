@@ -1,13 +1,13 @@
 /**
  * Jev Gateway Client
  *
- * This module configures a client for Jev decision-making through the Vercel AI Gateway.
- * It runs structured decisions independently from Claude's main Anthropic client.
+ * This module configures a client for the Vercel AI Gateway and uses it for both
+ * structured (Jev) and regular decisions.
  *
  * Usage:
- *   - Claude Code continues using Anthropic API normally (ANTHROPIC_BASE_URL = api.anthropic.com)
- *   - Jev handles structured/non-deterministic decisions via Vercel AI Gateway
- *   - Both APIs are independent and can be used together in the same application
+ *   - Claude Code itself continues using the Anthropic API normally
+ *   - makeStructuredDecision and makeRegularDecision both go through Vercel AI Gateway
+ *   - createStandardAnthropicClient (direct api.anthropic.com) remains available but unused
  */
 
 import Anthropic from "@anthropic-ai/sdk";

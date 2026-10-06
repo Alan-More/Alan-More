@@ -7,10 +7,10 @@
 
 ## 🎯 Goals
 
-1. **Dual-Channel AI Architecture**
-   - Claude Code continues using Anthropic API normally
-   - Jev handles structured decisions through Vercel AI Gateway
-   - Both APIs coexist without conflicts
+1. **Single Gateway for App Calls**
+   - Claude Code itself continues using the Anthropic API normally
+   - The app's structured (Jev) and regular decisions both go through Vercel AI Gateway
+   - No `ANTHROPIC_API_KEY` is needed for the app
 
 2. **Secure Secret Management**
    - `AI_GATEWAY_API_KEY` stored in Claude Platform Credential Vaults
@@ -18,20 +18,22 @@
    - No secrets in Git, logs, or configuration
 
 3. **Clear Separation of Concerns**
-   - Structured decisions → Jev (guaranteed schema compliance)
+   - Structured decisions → Jev (JSON matching a schema)
    - Regular decisions → Claude (flexible responses)
 
 ## 🏗️ Architecture
 
 ```
 Claude Code Environment
-├── [Standard Path]
-│   └── Anthropic API (api.anthropic.com)
-│       └── Regular tasks: conversations, code gen, analysis
-└── [Jev Path]
-    └── Vercel AI Gateway
-        └── Structured decisions: classification, validation
+└── Vercel AI Gateway (ai-gateway.vercel.sh, model anthropic/claude-opus-5-5)
+    ├── [Jev Path] makeStructuredDecision
+    │   └── Structured decisions: classification, validation
+    └── [Regular Path] makeRegularDecision
+        └── Regular tasks: conversations, code gen, analysis
 ```
+
+- Gateway model IDs are provider-prefixed (`anthropic/...`)
+- `createStandardAnthropicClient()` (direct `api.anthropic.com`) is still exported but unused
 
 ## 📂 Project Structure
 
@@ -57,6 +59,8 @@ alan-more/
 - `AI_GATEWAY_API_KEY` → Claude Platform Credential Vaults
 - Encrypted, persistent across sessions
 - Never in logs, Git, or plaintext config
+- In cloud sessions the egress proxy injects gateway credentials; with no
+  `AI_GATEWAY_API_KEY` set, the client sends a placeholder the proxy replaces
 
 **❌ NEVER:**
 - Hardcode secrets
@@ -75,9 +79,11 @@ alan-more/
 
 2. **Run examples:**
    ```bash
-   node src/examples/jev-structured-decision.js
-   node src/examples/normal-claude-usage.js
+   NODE_USE_ENV_PROXY=1 node src/examples/jev-structured-decision.js
+   NODE_USE_ENV_PROXY=1 node src/examples/normal-claude-usage.js
    ```
+   `NODE_USE_ENV_PROXY=1` makes Node route requests through the cloud session proxy
+   (without it the gateway returns `403 Host not in allowlist`). It's harmless elsewhere.
 
 ## 📝 Conventions
 
@@ -100,4 +106,4 @@ Current examples in `src/examples/` are working tests.
 
 ---
 
-**Last Updated:** October 5, 2026
+**Last Updated:** October 6, 2026
