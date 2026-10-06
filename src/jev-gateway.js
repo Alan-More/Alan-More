@@ -95,7 +95,7 @@ export async function makeStructuredDecision(decisionConfig) {
 }
 
 /**
- * Makes a regular (non-structured) decision using standard Anthropic API
+ * Makes a regular (non-structured) decision through the Vercel AI Gateway
  * Use this for general conversations and non-structured responses
  *
  * @param {string} prompt - The conversation prompt
@@ -103,10 +103,10 @@ export async function makeStructuredDecision(decisionConfig) {
  * @returns {Promise<string>} Response text from Claude
  */
 export async function makeRegularDecision(prompt, options = {}) {
-  const { model = "claude-opus-5-5", temperature = 1 } = options;
+  const { model = AI_GATEWAY_DEFAULT_MODEL, temperature = 1 } = options;
 
   try {
-    const client = createStandardAnthropicClient();
+    const client = createJevGatewayClient();
 
     const response = await client.messages.create({
       model: model,
