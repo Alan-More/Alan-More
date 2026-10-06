@@ -1,34 +1,54 @@
 /**
  * Jev Gateway Client
  *
- * This module configures a client for Jev decision-making through the Vercel AI Gateway.
- * It runs structured decisions independently from Claude's main Anthropic client.
+ * This module configures clients for the Vercel AI Gateway: TypeSafe Jev (typesafe-ai/jev)
+ * for structured decisions and Claude (anthropic/claude-opus-5-5) for regular decisions.
  *
  * Usage:
- *   - Claude Code continues using Anthropic API normally (ANTHROPIC_BASE_URL = api.anthropic.com)
- *   - Jev handles structured/non-deterministic decisions via Vercel AI Gateway
- *   - Both APIs are independent and can be used together in the same application
+ *   - Claude Code itself continues using the Anthropic API normally
+ *   - makeStructuredDecision and makeRegularDecision both go through Vercel AI Gateway
+ *   - createStandardAnthropicClient (direct api.anthropic.com) remains available but unused
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { JevClient } from "@opengeni/jev";
+
+const AI_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh";
+const AI_GATEWAY_DEFAULT_MODEL = "anthropic/claude-opus-5-5";
+const GATEWAY_PROXY_PLACEHOLDER_KEY = "proxy-injected";
+// The gateway serves a TypeSafe-compatible API here: POST /typesafe/v1/systemone
+const JEV_GATEWAY_BASE_URL = `${AI_GATEWAY_BASE_URL}/typesafe`;
+const JEV_MODEL = "typesafe-ai/jev";
+
+function getGatewayApiKey() {
+  return process.env.AI_GATEWAY_API_KEY || GATEWAY_PROXY_PLACEHOLDER_KEY;
+}
 
 /**
  * Creates an Anthropic client configured for Vercel AI Gateway
+ * If AI_GATEWAY_API_KEY is not set, a placeholder is sent instead; this relies on
+ * an egress proxy (e.g. Claude Code cloud sessions) injecting the real credentials.
  * @returns {Anthropic} Client pointing to Vercel AI Gateway
- * @throws {Error} If AI_GATEWAY_API_KEY is not set
  */
 export function createJevGatewayClient() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "AI_GATEWAY_API_KEY not found. Please configure it via Claude Platform Credential Vaults."
-    );
-  }
-
   return new Anthropic({
-    apiKey: apiKey,
-    baseURL: "https://api.gateway.vercel.com",
+    apiKey: getGatewayApiKey(),
+    baseURL: AI_GATEWAY_BASE_URL,
+    // Node's built-in fetch honors HTTPS_PROXY (with NODE_USE_ENV_PROXY=1); the SDK's bundled node-fetch does not
+    fetch: globalThis.fetch,
+  });
+}
+
+/**
+ * Creates a TypeSafe Jev client that reaches typesafe-ai/jev through Vercel AI Gateway
+ * Uses the same AI_GATEWAY_API_KEY / proxy-injected credentials as the Claude client.
+ * @returns {JevClient} Jev client pointing to the gateway's TypeSafe-compatible API
+ */
+export function createJevClient() {
+  return new JevClient({
+    apiKey: getGatewayApiKey(),
+    baseUrl: JEV_GATEWAY_BASE_URL,
+    model: JEV_MODEL,
   });
 }
 
@@ -44,47 +64,26 @@ export function createStandardAnthropicClient() {
 }
 
 /**
- * Makes a structured decision using Jev through the Vercel AI Gateway
- * Use this for non-deterministic decisions that need structured output
+ * Makes a structured decision using Jev (typesafe-ai/jev) through the Vercel AI Gateway
+ * Jev answers typed questions about a shared state; it does not generate free-form text.
+ *
+ * Question types:
+ *   - choice: { type: "choice", instructions, criteria: { optionA: null | "when to pick it", ... } }
+ *   - noul:   { type: "noul", instructions, criteria?: { true?, false? } } (probability of "yes")
+ *   - score:  { type: "score", instructions, criteria: [...] }
  *
  * @param {Object} decisionConfig - Configuration for the structured decision
- * @param {string} decisionConfig.prompt - The decision-making prompt
- * @param {Object} decisionConfig.schema - JSON schema defining the expected response structure
- * @param {string} [decisionConfig.model] - Model to use (defaults to claude-opus-5-5)
- * @param {number} [decisionConfig.temperature] - Temperature for the decision (0-1)
- * @returns {Promise<Object>} Parsed response matching the schema
+ * @param {string|Object} decisionConfig.state - The situation being judged (text or JSON)
+ * @param {Object} decisionConfig.questions - Named Jev questions, e.g. { sentiment: {...} }
+ * @returns {Promise<Object>} { answers, model, usage, requests, costUsd }; for a choice answer,
+ *   answers.<name> is { type: "choice", option, probabilities?, confidence? }
  */
 export async function makeStructuredDecision(decisionConfig) {
-  const {
-    prompt,
-    schema,
-    model = "claude-opus-5-5",
-    temperature = 0,
-  } = decisionConfig;
+  const { state, questions } = decisionConfig;
 
   try {
-    const client = createJevGatewayClient();
-
-    const response = await client.messages.create({
-      model: model,
-      max_tokens: 1024,
-      temperature: temperature,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      system: `You are a decision-making assistant. Respond with valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}`,
-    });
-
-    const textContent = response.content.find((block) => block.type === "text");
-    if (!textContent || textContent.type !== "text") {
-      throw new Error("No text content in response");
-    }
-
-    const result = JSON.parse(textContent.text);
-    return result;
+    const jev = createJevClient();
+    return await jev.ask(state, questions);
   } catch (error) {
     console.error("Error making structured decision:", error.message);
     throw error;
@@ -92,7 +91,7 @@ export async function makeStructuredDecision(decisionConfig) {
 }
 
 /**
- * Makes a regular (non-structured) decision using standard Anthropic API
+ * Makes a regular (non-structured) decision through the Vercel AI Gateway
  * Use this for general conversations and non-structured responses
  *
  * @param {string} prompt - The conversation prompt
@@ -100,10 +99,10 @@ export async function makeStructuredDecision(decisionConfig) {
  * @returns {Promise<string>} Response text from Claude
  */
 export async function makeRegularDecision(prompt, options = {}) {
-  const { model = "claude-opus-5-5", temperature = 1 } = options;
+  const { model = AI_GATEWAY_DEFAULT_MODEL, temperature = 1 } = options;
 
   try {
-    const client = createStandardAnthropicClient();
+    const client = createJevGatewayClient();
 
     const response = await client.messages.create({
       model: model,
@@ -131,6 +130,7 @@ export async function makeRegularDecision(prompt, options = {}) {
 
 export default {
   createJevGatewayClient,
+  createJevClient,
   createStandardAnthropicClient,
   makeStructuredDecision,
   makeRegularDecision,

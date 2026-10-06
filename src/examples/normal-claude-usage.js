@@ -1,8 +1,8 @@
 /**
- * Example: Normal Claude Usage (Standard Anthropic API)
+ * Example: Normal Claude Usage (via Vercel AI Gateway)
  *
- * This example shows how Claude Code continues to use the standard Anthropic API
- * for regular conversations and general tasks.
+ * This example shows regular conversations and general tasks, routed through
+ * the Vercel AI Gateway like structured decisions.
  *
  * Run: node src/examples/normal-claude-usage.js
  */
@@ -62,8 +62,7 @@ async function runExamples() {
   console.log("   Normal Claude Usage Examples");
   console.log("═══════════════════════════════════════════════\n");
 
-  console.log("ℹ️  These examples use the standard Anthropic API");
-  console.log("ℹ️  ANTHROPIC_BASE_URL remains api.anthropic.com\n");
+  console.log("ℹ️  These examples use Claude through the Vercel AI Gateway\n");
 
   await askQuestion();
   await generateCode();
