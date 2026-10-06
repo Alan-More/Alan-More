@@ -12,23 +12,24 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
+const AI_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh";
+const AI_GATEWAY_DEFAULT_MODEL = "anthropic/claude-opus-5-5";
+const GATEWAY_PROXY_PLACEHOLDER_KEY = "proxy-injected";
+
 /**
  * Creates an Anthropic client configured for Vercel AI Gateway
+ * If AI_GATEWAY_API_KEY is not set, a placeholder is sent instead; this relies on
+ * an egress proxy (e.g. Claude Code cloud sessions) injecting the real credentials.
  * @returns {Anthropic} Client pointing to Vercel AI Gateway
- * @throws {Error} If AI_GATEWAY_API_KEY is not set
  */
 export function createJevGatewayClient() {
-  const apiKey = process.env.AI_GATEWAY_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "AI_GATEWAY_API_KEY not found. Please configure it via Claude Platform Credential Vaults."
-    );
-  }
+  const apiKey = process.env.AI_GATEWAY_API_KEY || GATEWAY_PROXY_PLACEHOLDER_KEY;
 
   return new Anthropic({
     apiKey: apiKey,
-    baseURL: "https://api.gateway.vercel.com",
+    baseURL: AI_GATEWAY_BASE_URL,
+    // Node's built-in fetch honors HTTPS_PROXY (with NODE_USE_ENV_PROXY=1); the SDK's bundled node-fetch does not
+    fetch: globalThis.fetch,
   });
 }
 
@@ -50,7 +51,7 @@ export function createStandardAnthropicClient() {
  * @param {Object} decisionConfig - Configuration for the structured decision
  * @param {string} decisionConfig.prompt - The decision-making prompt
  * @param {Object} decisionConfig.schema - JSON schema defining the expected response structure
- * @param {string} [decisionConfig.model] - Model to use (defaults to claude-opus-5-5)
+ * @param {string} [decisionConfig.model] - Gateway model ID (defaults to anthropic/claude-opus-5-5)
  * @param {number} [decisionConfig.temperature] - Temperature for the decision (0-1)
  * @returns {Promise<Object>} Parsed response matching the schema
  */
@@ -58,7 +59,7 @@ export async function makeStructuredDecision(decisionConfig) {
   const {
     prompt,
     schema,
-    model = "claude-opus-5-5",
+    model = AI_GATEWAY_DEFAULT_MODEL,
     temperature = 0,
   } = decisionConfig;
 
@@ -83,7 +84,9 @@ export async function makeStructuredDecision(decisionConfig) {
       throw new Error("No text content in response");
     }
 
-    const result = JSON.parse(textContent.text);
+    // Models sometimes wrap JSON in a ```json fence despite the instructions
+    const jsonText = textContent.text.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/, "$1");
+    const result = JSON.parse(jsonText);
     return result;
   } catch (error) {
     console.error("Error making structured decision:", error.message);
