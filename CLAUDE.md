@@ -3,7 +3,7 @@
 **Project:** Alan-More Jev Integration  
 **Purpose:** Integrate Jev (structured decision-making) with Claude Code via Vercel AI Gateway  
 **Status:** Active Development  
-**Branch:** `claude/jev-invocation-audit-rbu8fy`
+**Default branch:** `claude/jev-invocation-audit-o6404h`
 
 ## 🎯 Goals
 
@@ -48,6 +48,9 @@ alan-more/
 ├── CLAUDE.md
 ├── .env.example
 ├── .gitignore
+├── .claude/
+│   ├── settings.json
+│   └── hooks/session-start.sh   # cloud sessions: npm install + NODE_USE_ENV_PROXY
 ├── src/
 │   ├── index.js
 │   ├── jev-gateway.js
@@ -110,4 +113,4 @@ Current examples in `src/examples/` are working tests.
 
 ---
 
-**Last Updated:** October 6, 2026
+**Last Updated:** October 26, 2026
